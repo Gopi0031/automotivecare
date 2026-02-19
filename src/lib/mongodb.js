@@ -10,6 +10,7 @@ if (!uri) {
   throw new Error("Add MONGODB_URI to .env.local");
 }
 
+
 if (process.env.NODE_ENV === "development") {
   if (!global._mongoClientPromise) {
     client = new MongoClient(uri, options);
