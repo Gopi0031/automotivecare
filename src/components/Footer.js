@@ -51,15 +51,25 @@ export default function Footer() {
 
           {/* Services */}
           <div>
-            <h4 className="text-xs tracking-[0.2em] uppercase text-gray-500 mb-6 font-light">Our Services</h4>
+            <h4 className="text-xs tracking-[0.2em] uppercase text-gray-500 mb-6 font-light">
+              Our Services
+            </h4>
+
             <ul className="space-y-3 text-gray-400 text-sm font-light">
-              <li>Car Wash</li>
-              <li>Car Detailing</li>
-              <li>Maintenance</li>
-              <li>Paint Protection</li>
-              <li>Interior Cleaning</li>
+              <li>Mechanical Works</li>
+              <li>Electrical Works</li>
+              <li>Maintenance Services</li>
+              <li>Car A/C Works</li>
+              <li>General Check Up</li>
+              <li>General Services</li>
+              <li>
+    <Link href="/special-services" className="text-amber-400 hover:text-red-300">
+      Special Services
+    </Link>
+  </li>
             </ul>
           </div>
+
 
           {/* Contact Info */}
           <div>
