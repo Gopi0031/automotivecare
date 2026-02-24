@@ -5,24 +5,26 @@ import Link from "next/link";
 import "./booking.css";
 
 export default function BookingPage() {
-  const [services, setServices] = useState([]);
+  const [generalServices, setGeneralServices] = useState([]);   // from /api/detailed-services
+  const [specialServices, setSpecialServices] = useState([]);   // from /api/special-services
   const [vehicleBrands, setVehicleBrands] = useState([]);
   const [availableModels, setAvailableModels] = useState([]);
   const [selectionMode, setSelectionMode] = useState("single"); // "single" or "multiple"
-  
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     countryCode: "+91",
     phone: "",
-    primaryService: "",
-    additionalServices: [],
+    primaryService: "",       // { slug, name, type } for single mode
+    additionalServices: [],   // [{ slug, name, type }] for multiple mode
     vehicleBrand: "",
     vehicleModel: "",
     bookingDate: "",
     bookingTime: "",
     notes: "",
   });
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [phoneError, setPhoneError] = useState("");
@@ -40,100 +42,114 @@ export default function BookingPage() {
 
   useEffect(() => {
     fetchData();
-    
     const urlParams = new URLSearchParams(window.location.search);
-    const preSelectedService = urlParams.get('service');
+    const preSelectedService = urlParams.get("service");
+    const preSelectedType = urlParams.get("type") || "general";
     if (preSelectedService) {
-      setFormData(prev => ({ ...prev, primaryService: preSelectedService }));
+      setFormData(prev => ({
+        ...prev,
+        primaryService: { slug: preSelectedService, type: preSelectedType }
+      }));
     }
   }, []);
 
+  // ── Fetch both General + Special services ─────────────────────────────────
   const fetchData = async () => {
     try {
-      const [servicesRes, brandsRes] = await Promise.all([
-        fetch("/api/services"),
+      const [generalRes, specialRes, brandsRes] = await Promise.all([
+        fetch("/api/detailed-services"),
+        fetch("/api/special-services"),
         fetch("/api/vehicle-brands"),
       ]);
 
-      if (!servicesRes.ok || !brandsRes.ok) {
-        console.error("API failed");
-        return;
-      }
+      const generalData = generalRes.ok ? await generalRes.json() : {};
+      const specialData = specialRes.ok ? await specialRes.json() : {};
+      const brandsData = brandsRes.ok ? await brandsRes.json() : {};
 
-      const servicesData = await servicesRes.json();
-      const brandsData = await brandsRes.json();
-
-      setServices(servicesData.services || []);
+      setGeneralServices(
+        (generalData.services || []).map(s => ({ ...s, type: "general" }))
+      );
+      setSpecialServices(
+        (specialData.services || []).map(s => ({ ...s, type: "special" }))
+      );
       setVehicleBrands(brandsData.brands || []);
     } catch (error) {
       console.error("Error fetching data:", error);
     }
   };
 
+  // ── All services combined ─────────────────────────────────────────────────
+  const allServices = [
+    ...generalServices.map(s => ({ ...s, type: "general" })),
+    ...specialServices.map(s => ({ ...s, type: "special" })),
+  ];
+
+  const totalServices = allServices.length;
+
+  // ── Brand change ──────────────────────────────────────────────────────────
   const handleBrandChange = (e) => {
     const selectedBrandSlug = e.target.value;
-    setFormData({ 
-      ...formData, 
-      vehicleBrand: selectedBrandSlug,
-      vehicleModel: ""
-    });
-    
+    setFormData({ ...formData, vehicleBrand: selectedBrandSlug, vehicleModel: "" });
     const selectedBrand = vehicleBrands.find(b => b.slug === selectedBrandSlug);
-    if (selectedBrand) {
-      setAvailableModels(selectedBrand.models || []);
-    } else {
-      setAvailableModels([]);
-    }
+    setAvailableModels(selectedBrand?.models || []);
   };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleServiceToggle = (serviceSlug) => {
+  // ── Service toggle ────────────────────────────────────────────────────────
+  const handleServiceToggle = (service) => {
+    // service = { _id, slug, name, type }
     if (selectionMode === "single") {
       setFormData(prev => ({
         ...prev,
-        primaryService: serviceSlug,
-        additionalServices: []
+        primaryService: service,
+        additionalServices: [],
       }));
     } else {
       setFormData(prev => {
-        const isSelected = prev.additionalServices.includes(serviceSlug);
+        const exists = prev.additionalServices.find(s => s.slug === service.slug);
         return {
           ...prev,
-          additionalServices: isSelected
-            ? prev.additionalServices.filter(s => s !== serviceSlug)
-            : [...prev.additionalServices, serviceSlug]
+          additionalServices: exists
+            ? prev.additionalServices.filter(s => s.slug !== service.slug)
+            : [...prev.additionalServices, service],
         };
       });
     }
   };
 
+  // ── Phone ─────────────────────────────────────────────────────────────────
   const handlePhoneChange = (e) => {
-    const value = e.target.value;
-    const numericValue = value.replace(/\D/g, "");
-    const limitedValue = numericValue.slice(0, 10);
-    
-    setFormData({ ...formData, phone: limitedValue });
-    
-    if (limitedValue.length > 0 && limitedValue.length < 10) {
-      setPhoneError("Phone number must be 10 digits");
-    } else {
-      setPhoneError("");
-    }
+    const numericValue = e.target.value.replace(/\D/g, "").slice(0, 10);
+    setFormData({ ...formData, phone: numericValue });
+    setPhoneError(
+      numericValue.length > 0 && numericValue.length < 10
+        ? "Phone number must be 10 digits"
+        : ""
+    );
   };
 
+  // ── Get service page URL ──────────────────────────────────────────────────
+  const getServiceUrl = (service) => {
+    if (!service) return "#";
+    if (service.type === "special") {
+      return `/special-services?service=${service.slug}`;
+    }
+    return `/service?service=${service.slug}`;
+  };
+
+  // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (formData.phone.length !== 10) {
       setPhoneError("Phone number must be exactly 10 digits");
       return;
     }
 
-    // Validate service selection
-    if (selectionMode === "single" && !formData.primaryService) {
+    if (selectionMode === "single" && !formData.primaryService?.slug) {
       setMessage("Please select a service");
       return;
     }
@@ -148,7 +164,7 @@ export default function BookingPage() {
 
     try {
       const selectedBrand = vehicleBrands.find(b => b.slug === formData.vehicleBrand);
-      
+
       let bookingData = {
         name: formData.name,
         email: formData.email,
@@ -161,21 +177,20 @@ export default function BookingPage() {
       };
 
       if (selectionMode === "single") {
-        const selectedService = services.find(s => s.slug === formData.primaryService);
-        bookingData.service = formData.primaryService;
-        bookingData.serviceName = selectedService?.name || formData.primaryService;
+        bookingData.service = formData.primaryService.slug;
+        bookingData.serviceName = formData.primaryService.name;
+        bookingData.serviceType = formData.primaryService.type; // ✅ Save type
         bookingData.additionalServices = [];
       } else {
-        const selectedServices = formData.additionalServices.map(slug => {
-          const service = services.find(s => s.slug === slug);
-          return {
-            slug: slug,
-            name: service?.name || slug
-          };
-        });
-        bookingData.service = selectedServices[0]?.slug || "";
-        bookingData.serviceName = selectedServices[0]?.name || "";
-        bookingData.additionalServices = selectedServices.slice(1);
+        const [first, ...rest] = formData.additionalServices;
+        bookingData.service = first?.slug || "";
+        bookingData.serviceName = first?.name || "";
+        bookingData.serviceType = first?.type || "general";
+        bookingData.additionalServices = rest.map(s => ({
+          slug: s.slug,
+          name: s.name,
+          type: s.type,
+        }));
       }
 
       const response = await fetch("/api/bookings", {
@@ -185,17 +200,17 @@ export default function BookingPage() {
       });
 
       const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
+      if (!contentType?.includes("application/json")) {
         const text = await response.text();
-        console.error("Expected JSON but got:", text.substring(0, 200));
-        setMessage("Server error: API route not found or returned invalid response.");
+        console.error("Non-JSON response:", text.substring(0, 200));
+        setMessage("Server error: Invalid response.");
         return;
       }
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setMessage(data.message || "Booking submitted successfully! Check your email for confirmation.");
+        setMessage(data.message || "Booking submitted successfully!");
         setFormData({
           name: "",
           email: "",
@@ -211,55 +226,53 @@ export default function BookingPage() {
         });
         setPhoneError("");
         setAvailableModels([]);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
-        setMessage(data.error || "Failed to submit booking. Please try again.");
+        setMessage(data.error || "Failed to submit booking.");
       }
     } catch (error) {
-      console.error("Booking error:", error);
       setMessage("An error occurred: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // ✨ NEW: Get selected service name for single mode
-  const getSelectedServiceName = () => {
-    if (selectionMode === "single" && formData.primaryService) {
-      return services.find(s => s.slug === formData.primaryService)?.name || "";
+  const isServiceSelected = (service) => {
+    if (selectionMode === "single") {
+      return formData.primaryService?.slug === service.slug;
     }
-    return "";
+    return formData.additionalServices.some(s => s.slug === service.slug);
   };
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Hero Section */}
+      {/* Hero */}
       <section className="hero-section">
-        <div className="hero-bg">
-          <div className="hero-gradient"></div>
-        </div>
+        <div className="hero-bg"><div className="hero-gradient"></div></div>
         <div className="hero-content">
           <p className="hero-subtitle">Reserve Your Spot</p>
-          <h1 className="hero-title">
-            Book Your <em>Service</em>
-          </h1>
+          <h1 className="hero-title">Book Your <em>Service</em></h1>
           <div className="hero-divider"></div>
-          <p className="hero-description">
-            Schedule your appointment in just a few clicks
-          </p>
+          <p className="hero-description">Schedule your appointment in just a few clicks</p>
         </div>
       </section>
 
-      {/* Booking Form Section */}
+      {/* Form */}
       <section className="form-section">
         <div className="form-container">
-          
-          {/* Success/Error Message */}
+
+          {/* Message */}
           {message && (
-            <div className={`message-box ${message.includes("success") || message.includes("email") ? "message-success" : "message-error"}`}>
+            <div className={`message-box ${
+              message.toLowerCase().includes("success") || message.includes("email")
+                ? "message-success"
+                : "message-error"
+            }`}>
               <div style={{ display: "flex", alignItems: "flex-start" }}>
-                <div className="message-icon" style={{ color: message.includes("success") ? "#16a34a" : "#dc2626" }}>
-                  {message.includes("success") ? (
+                <div className="message-icon" style={{
+                  color: message.toLowerCase().includes("success") ? "#16a34a" : "#dc2626"
+                }}>
+                  {message.toLowerCase().includes("success") ? (
                     <svg fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
@@ -269,72 +282,38 @@ export default function BookingPage() {
                     </svg>
                   )}
                 </div>
-                <div style={{ marginLeft: "1rem", flex: 1 }}>
-                  <p className={`message-text ${message.includes("success") ? "text-green-800" : "text-red-800"}`}>{message}</p>
-                </div>
+                <p style={{ marginLeft: "1rem" }}>{message}</p>
               </div>
             </div>
           )}
 
-          {/* Booking Form Card */}
           <div className="form-card">
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
-              
+
               {/* Personal Information */}
               <div>
                 <h3 className="form-section-title">Personal Information</h3>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "2rem" }}>
                   <div>
                     <label className="form-label">Full Name *</label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      required
-                      className="form-input"
-                      placeholder="Your Name"
-                    />
+                    <input type="text" name="name" value={formData.name} onChange={handleChange} required className="form-input" placeholder="Your Name" />
                   </div>
-
                   <div>
                     <label className="form-label">Email Address *</label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      required
-                      className="form-input"
-                      placeholder="yourmail@gmail.com"
-                    />
+                    <input type="email" name="email" value={formData.email} onChange={handleChange} required className="form-input" placeholder="yourmail@gmail.com" />
                   </div>
-
                   <div style={{ gridColumn: "1 / -1" }}>
                     <label className="form-label">Phone Number *</label>
                     <div style={{ display: "flex", gap: "0.75rem" }}>
-                      <select
-                        name="countryCode"
-                        value={formData.countryCode}
-                        onChange={handleChange}
-                        className="form-select"
-                        style={{ width: "9rem" }}
-                      >
-                        {countryCodes.map((country) => (
-                          <option key={country.code} value={country.code}>
-                            {country.flag} {country.code}
-                          </option>
+                      <select name="countryCode" value={formData.countryCode} onChange={handleChange} className="form-select" style={{ width: "9rem" }}>
+                        {countryCodes.map(c => (
+                          <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
                         ))}
                       </select>
                       <div style={{ flex: 1 }}>
                         <input
-                          type="tel"
-                          name="phone"
-                          value={formData.phone}
-                          onChange={handlePhoneChange}
-                          required
-                          maxLength="10"
-                          pattern="\d{10}"
+                          type="tel" name="phone" value={formData.phone}
+                          onChange={handlePhoneChange} required maxLength="10"
                           className={`form-input ${phoneError ? "phone-input-error" : ""}`}
                           placeholder="1234567890"
                         />
@@ -346,7 +325,7 @@ export default function BookingPage() {
                             {phoneError}
                           </p>
                         )}
-                        {formData.phone && !phoneError && formData.phone.length === 10 && (
+                        {formData.phone.length === 10 && !phoneError && (
                           <p className="success-text">
                             <svg style={{ width: "1rem", height: "1rem", marginRight: "0.5rem" }} fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -356,16 +335,16 @@ export default function BookingPage() {
                         )}
                       </div>
                     </div>
-                    <p className="helper-text">Enter 10-digit mobile number (numbers only)</p>
+                    <p className="helper-text">Enter 10-digit mobile number</p>
                   </div>
                 </div>
               </div>
 
-              {/* Service Selection */}
+              {/* ── Service Selection ──────────────────────────────────── */}
               <div>
                 <h3 className="form-section-title">Service Selection</h3>
-                
-                {/* Toggle Between Single/Multiple */}
+
+                {/* Toggle */}
                 <div className="service-mode-toggle">
                   <button
                     type="button"
@@ -389,164 +368,251 @@ export default function BookingPage() {
                   </button>
                 </div>
 
-                {/* Single Service Selection */}
-                {selectionMode === "single" && (
-                  <div>
-                    <label className="form-label">Choose Your Service *</label>
-                    <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
-                      <div style={{ flex: 1 }}>
-                        <select
-                          name="primaryService"
-                          value={formData.primaryService}
-                          onChange={handleChange}
-                          required
-                          className="form-select"
-                        >
-                          <option value="">Select a service</option>
-                          {services.map((service) => (
-                            <option key={service._id} value={service.slug}>
-                              {service.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      {/* ✨ NEW: Arrow button to view service details */}
-                      {formData.primaryService && getSelectedServiceName() && (
-                        <Link
-                          href={`/service?category=${formData.primaryService}`}
-                          title={`View details for ${getSelectedServiceName()}`}
-                          className="service-nav-button"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            padding: "0.75rem 1rem",
-                            backgroundColor: "rgb(22, 163, 74)",
-                            color: "white",
-                            borderRadius: "0.5rem",
-                            textDecoration: "none",
-                            transition: "all 0.3s ease",
-                            marginTop: "0.25rem",
-                            cursor: "pointer",
-                            border: "none",
-                            fontWeight: "600",
-                            boxShadow: "0 4px 12px rgba(22, 163, 74, 0.4)",
-                            whiteSpace: "nowrap",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = "rgb(21, 128, 61)";
-                            e.target.style.boxShadow = "0 6px 18px rgba(22, 163, 74, 0.6)";
-                            e.target.style.transform = "translateY(-2px)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = "rgb(22, 163, 74)";
-                            e.target.style.boxShadow = "0 4px 12px rgba(22, 163, 74, 0.4)";
-                            e.target.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <svg
-                            style={{ width: "1.25rem", height: "1.25rem" }}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M13 7l5 5m0 0l-5 5m5-5H6"
-                            />
-                          </svg>
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                )}
+                {/* ── General Services Section ── */}
+                {generalServices.length > 0 && (
+                  <div style={{ marginBottom: "1.5rem" }}>
+                    <h4 style={{
+                      fontSize: "1rem", fontWeight: "600",
+                      color: "#15803d", marginBottom: "0.75rem",
+                      paddingBottom: "0.5rem",
+                      borderBottom: "2px solid #bbf7d0",
+                      display: "flex", alignItems: "center", gap: "0.5rem"
+                    }}>
+                      ⚙️ General Services
+                    </h4>
 
-                {/* Multiple Service Selection */}
-                {selectionMode === "multiple" && (
-                  <div>
-                    <label className="form-label">Select Services * (Choose one or more)</label>
-                    <p className="helper-text" style={{ marginBottom: "1rem" }}>
-                      Select all services you need
-                    </p>
-                    <div className="checkbox-grid">
-                      {services.map((service) => (
-                        <div key={service._id} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          <label className="checkbox-label" style={{ flex: 1 }}>
-                            <input
-                              type="checkbox"
-                              checked={formData.additionalServices.includes(service.slug)}
-                              onChange={() => handleServiceToggle(service.slug)}
-                              className="checkbox-input"
-                            />
-                            <div className="checkbox-text">{service.name}</div>
-                          </label>
-                          
-                          {/* ✨ NEW: Arrow button for each service in multiple mode */}
-                          <Link
-                            href={`/service?category=${service.slug}`}
-                            title={`View details for ${service.name}`}
-                            className="service-nav-button-small"
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              padding: "0.5rem",
-                              backgroundColor: "rgb(59, 130, 246)",
-                              color: "white",
-                              borderRadius: "0.375rem",
-                              textDecoration: "none",
-                              transition: "all 0.3s ease",
-                              cursor: "pointer",
-                              border: "none",
-                              boxShadow: "0 2px 8px rgba(59, 130, 246, 0.3)",
+                    {selectionMode === "single" ? (
+                      /* Single mode - dropdown for general */
+                      <div>
+                        <label className="form-label">Choose a General Service</label>
+                        <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
+                          <select
+                            value={formData.primaryService?.type === "general" ? formData.primaryService.slug : ""}
+                            onChange={e => {
+                              const slug = e.target.value;
+                              if (!slug) {
+                                setFormData(prev => ({ ...prev, primaryService: "" }));
+                                return;
+                              }
+                              const svc = generalServices.find(s => s.slug === slug);
+                              setFormData(prev => ({
+                                ...prev,
+                                primaryService: { slug: svc.slug, name: svc.name, type: "general" }
+                              }));
                             }}
-                            onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = "rgb(37, 99, 235)";
-                              e.target.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.5)";
-                              e.target.style.transform = "scale(1.1)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = "rgb(59, 130, 246)";
-                              e.target.style.boxShadow = "0 2px 8px rgba(59, 130, 246, 0.3)";
-                              e.target.style.transform = "scale(1)";
-                            }}
+                            className="form-select"
+                            style={{ flex: 1 }}
                           >
-                            <svg
-                              style={{ width: "1rem", height: "1rem" }}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
+                            <option value="">Select a general service</option>
+                            {generalServices.map(s => (
+                              <option key={s._id} value={s.slug}>{s.name}</option>
+                            ))}
+                          </select>
+
+                          {/* Arrow to /service page */}
+                          {formData.primaryService?.type === "general" && (
+                            <Link
+                              href={`/service?service=${formData.primaryService.slug}`}
+                              title={`View ${formData.primaryService.name}`}
+                              style={{
+                                display: "inline-flex", alignItems: "center",
+                                justifyContent: "center", padding: "0.75rem 1rem",
+                                backgroundColor: "rgb(22,163,74)", color: "white",
+                                borderRadius: "0.5rem", textDecoration: "none",
+                                marginTop: "0.25rem", whiteSpace: "nowrap",
+                                boxShadow: "0 4px 12px rgba(22,163,74,0.4)",
+                                transition: "all 0.3s ease",
+                              }}
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M13 7l5 5m0 0l-5 5m5-5H6"
-                              />
-                            </svg>
-                          </Link>
+                              <svg style={{ width: "1.25rem", height: "1.25rem" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                              </svg>
+                            </Link>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                    {formData.additionalServices.length > 0 && (
-                      <p className="success-text" style={{ marginTop: "1rem" }}>
-                        <svg style={{ width: "1rem", height: "1rem", marginRight: "0.5rem" }} fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        {formData.additionalServices.length} service{formData.additionalServices.length > 1 ? 's' : ''} selected
-                      </p>
+                      </div>
+                    ) : (
+                      /* Multiple mode - checkboxes for general */
+                      <div className="checkbox-grid">
+                        {generalServices.map(service => (
+                          <div key={service._id} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <label className="checkbox-label" style={{ flex: 1 }}>
+                              <input
+                                type="checkbox"
+                                checked={isServiceSelected(service)}
+                                onChange={() => handleServiceToggle({
+                                  _id: service._id,
+                                  slug: service.slug,
+                                  name: service.name,
+                                  type: "general"
+                                })}
+                                className="checkbox-input"
+                              />
+                              <div className="checkbox-text">{service.name}</div>
+                            </label>
+                            {/* Arrow to /service page */}
+                            <Link
+                              href={`/service?service=${service.slug}`}
+                              title={`View ${service.name}`}
+                              style={{
+                                display: "inline-flex", alignItems: "center",
+                                justifyContent: "center", padding: "0.5rem",
+                                backgroundColor: "rgb(22,163,74)", color: "white",
+                                borderRadius: "0.375rem", textDecoration: "none",
+                                boxShadow: "0 2px 8px rgba(22,163,74,0.3)",
+                                transition: "all 0.3s ease", flexShrink: 0,
+                              }}
+                            >
+                              <svg style={{ width: "1rem", height: "1rem" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                              </svg>
+                            </Link>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
 
-                {services.length === 0 && (
+                {/* ── Special Services Section ── */}
+                {specialServices.length > 0 && (
+                  <div style={{ marginBottom: "1.5rem" }}>
+                    <h4 style={{
+                      fontSize: "1rem", fontWeight: "600",
+                      color: "#dc2626", marginBottom: "0.75rem",
+                      paddingBottom: "0.5rem",
+                      borderBottom: "2px solid #fecaca",
+                      display: "flex", alignItems: "center", gap: "0.5rem"
+                    }}>
+                      ⭐ Special Services
+                    </h4>
+
+                    {selectionMode === "single" ? (
+                      /* Single mode - dropdown for special */
+                      <div>
+                        <label className="form-label">Choose a Special Service</label>
+                        <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
+                          <select
+                            value={formData.primaryService?.type === "special" ? formData.primaryService.slug : ""}
+                            onChange={e => {
+                              const slug = e.target.value;
+                              if (!slug) {
+                                setFormData(prev => ({ ...prev, primaryService: "" }));
+                                return;
+                              }
+                              const svc = specialServices.find(s => s.slug === slug);
+                              setFormData(prev => ({
+                                ...prev,
+                                primaryService: { slug: svc.slug, name: svc.name, type: "special" }
+                              }));
+                            }}
+                            className="form-select"
+                            style={{ flex: 1 }}
+                          >
+                            <option value="">Select a special service</option>
+                            {specialServices.map(s => (
+                              <option key={s._id} value={s.slug}>{s.name}</option>
+                            ))}
+                          </select>
+
+                          {/* Arrow to /special-services page */}
+                          {formData.primaryService?.type === "special" && (
+                            <Link
+                              href={`/special-services?service=${formData.primaryService.slug}`}
+                              title={`View ${formData.primaryService.name}`}
+                              style={{
+                                display: "inline-flex", alignItems: "center",
+                                justifyContent: "center", padding: "0.75rem 1rem",
+                                backgroundColor: "rgb(220,38,38)", color: "white",
+                                borderRadius: "0.5rem", textDecoration: "none",
+                                marginTop: "0.25rem", whiteSpace: "nowrap",
+                                boxShadow: "0 4px 12px rgba(220,38,38,0.4)",
+                                transition: "all 0.3s ease",
+                              }}
+                            >
+                              <svg style={{ width: "1.25rem", height: "1.25rem" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                              </svg>
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      /* Multiple mode - checkboxes for special */
+                      <div className="checkbox-grid">
+                        {specialServices.map(service => (
+                          <div key={service._id} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <label className="checkbox-label" style={{ flex: 1 }}>
+                              <input
+                                type="checkbox"
+                                checked={isServiceSelected(service)}
+                                onChange={() => handleServiceToggle({
+                                  _id: service._id,
+                                  slug: service.slug,
+                                  name: service.name,
+                                  type: "special"
+                                })}
+                                className="checkbox-input"
+                              />
+                              <div className="checkbox-text">{service.name}</div>
+                            </label>
+                            {/* Arrow to /special-services page */}
+                            <Link
+                              href={`/special-services?service=${service.slug}`}
+                              title={`View ${service.name}`}
+                              style={{
+                                display: "inline-flex", alignItems: "center",
+                                justifyContent: "center", padding: "0.5rem",
+                                backgroundColor: "rgb(220,38,38)", color: "white",
+                                borderRadius: "0.375rem", textDecoration: "none",
+                                boxShadow: "0 2px 8px rgba(220,38,38,0.3)",
+                                transition: "all 0.3s ease", flexShrink: 0,
+                              }}
+                            >
+                              <svg style={{ width: "1rem", height: "1rem" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                              </svg>
+                            </Link>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Selected summary for multiple mode */}
+                {selectionMode === "multiple" && formData.additionalServices.length > 0 && (
+                  <div style={{
+                    marginTop: "1rem", padding: "0.75rem 1rem",
+                    background: "#f0fdf4", borderRadius: "0.5rem",
+                    border: "1px solid #bbf7d0"
+                  }}>
+                    <p className="success-text" style={{ marginBottom: "0.5rem" }}>
+                      <svg style={{ width: "1rem", height: "1rem", marginRight: "0.5rem" }} fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      {formData.additionalServices.length} service{formData.additionalServices.length > 1 ? "s" : ""} selected
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                      {formData.additionalServices.map((s, i) => (
+                        <span key={i} style={{
+                          padding: "0.25rem 0.75rem",
+                          borderRadius: "9999px",
+                          fontSize: "0.8rem", fontWeight: "500",
+                          backgroundColor: s.type === "special" ? "#fef2f2" : "#f0fdf4",
+                          color: s.type === "special" ? "#dc2626" : "#15803d",
+                          border: `1px solid ${s.type === "special" ? "#fecaca" : "#bbf7d0"}`,
+                        }}>
+                          {s.type === "special" ? "⭐" : "⚙️"} {s.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* No services warning */}
+                {totalServices === 0 && (
                   <p className="error-text">
-                    <svg style={{ width: "1rem", height: "1rem", marginRight: "0.5rem" }} fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
                     ⚠️ No services available. Admin must add services first.
                   </p>
                 )}
@@ -558,39 +624,24 @@ export default function BookingPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "2rem" }}>
                   <div>
                     <label className="form-label">Vehicle Brand *</label>
-                    <select
-                      name="vehicleBrand"
-                      value={formData.vehicleBrand}
-                      onChange={handleBrandChange}
-                      required
-                      className="form-select"
-                    >
+                    <select name="vehicleBrand" value={formData.vehicleBrand} onChange={handleBrandChange} required className="form-select">
                       <option value="">Select brand</option>
-                      {vehicleBrands.map((brand) => (
-                        <option key={brand._id} value={brand.slug}>
-                          {brand.name}
-                        </option>
+                      {vehicleBrands.map(b => (
+                        <option key={b._id} value={b.slug}>{b.name}</option>
                       ))}
                     </select>
                   </div>
-
                   <div>
                     <label className="form-label">Vehicle Model *</label>
                     <select
-                      name="vehicleModel"
-                      value={formData.vehicleModel}
-                      onChange={handleChange}
-                      required
+                      name="vehicleModel" value={formData.vehicleModel}
+                      onChange={handleChange} required
                       disabled={!formData.vehicleBrand || availableModels.length === 0}
                       className="form-select"
                     >
-                      <option value="">
-                        {!formData.vehicleBrand ? "Select brand first" : "Select model"}
-                      </option>
-                      {availableModels.map((model, index) => (
-                        <option key={index} value={model}>
-                          {model}
-                        </option>
+                      <option value="">{!formData.vehicleBrand ? "Select brand first" : "Select model"}</option>
+                      {availableModels.map((m, i) => (
+                        <option key={i} value={m}>{m}</option>
                       ))}
                     </select>
                   </div>
@@ -603,63 +654,37 @@ export default function BookingPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "2rem" }}>
                   <div>
                     <label className="form-label">Preferred Date *</label>
-                    <input
-                      type="date"
-                      name="bookingDate"
-                      value={formData.bookingDate}
-                      onChange={handleChange}
-                      required
-                      min={new Date().toISOString().split("T")[0]}
-                      className="form-input"
-                    />
+                    <input type="date" name="bookingDate" value={formData.bookingDate} onChange={handleChange} required min={new Date().toISOString().split("T")[0]} className="form-input" />
                   </div>
-
                   <div>
                     <label className="form-label">Preferred Time *</label>
-                    <select
-                      name="bookingTime"
-                      value={formData.bookingTime}
-                      onChange={handleChange}
-                      required
-                      className="form-select"
-                    >
+                    <select name="bookingTime" value={formData.bookingTime} onChange={handleChange} required className="form-select">
                       <option value="">Select time slot</option>
-                      <option value="07:00 AM">07:00 AM</option>
-                      <option value="08:00 AM">08:00 AM</option>
-                      <option value="09:00 AM">09:00 AM</option>
-                      <option value="10:00 AM">10:00 AM</option>
-                      <option value="11:00 AM">11:00 AM</option>
-                      <option value="12:00 PM">12:00 PM</option>
-                      <option value="01:00 PM">01:00 PM</option>
-                      <option value="02:00 PM">02:00 PM</option>
-                      <option value="03:00 PM">03:00 PM</option>
-                      <option value="04:00 PM">04:00 PM</option>
-                      <option value="05:00 PM">05:00 PM</option>
-                      <option value="06:00 PM">06:00 PM</option>
-                      <option value="07:00 PM">07:00 PM</option>
+                      {["07:00 AM","08:00 AM","09:00 AM","10:00 AM","11:00 AM","12:00 PM","01:00 PM","02:00 PM","03:00 PM","04:00 PM","05:00 PM","06:00 PM","07:00 PM"].map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
               </div>
 
-              {/* Additional Notes */}
+              {/* Notes */}
               <div>
                 <label className="form-label">About Your Issue</label>
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleChange}
-                  rows={5}
-                  className="form-textarea"
-                  placeholder="Any specific requirements or concerns..."
-                />
+                <textarea name="notes" value={formData.notes} onChange={handleChange} rows={5} className="form-textarea" placeholder="Any specific requirements or concerns..." />
               </div>
 
-              {/* Submit Button */}
+              {/* Submit */}
               <div style={{ paddingTop: "1.5rem" }}>
                 <button
                   type="submit"
-                  disabled={loading || phoneError || formData.phone.length !== 10 || services.length === 0 || vehicleBrands.length === 0}
+                  disabled={
+                    loading ||
+                    !!phoneError ||
+                    formData.phone.length !== 10 ||
+                    totalServices === 0 ||
+                    vehicleBrands.length === 0
+                  }
                   className="submit-button"
                 >
                   <span className="submit-button-bg"></span>
@@ -667,8 +692,8 @@ export default function BookingPage() {
                     {loading ? (
                       <>
                         <svg style={{ width: "1.25rem", height: "1.25rem" }} className="animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
                         Submitting Your Booking...
                       </>
@@ -686,20 +711,18 @@ export default function BookingPage() {
             </form>
           </div>
 
-          {/* Quick Info Cards */}
+          {/* Info Cards */}
           <div className="info-cards">
             <div className="info-card">
               <div className="info-icon">⏰</div>
               <div className="info-number">24/7</div>
               <div className="info-label">Service Available</div>
             </div>
-            
             <div className="info-card">
               <div className="info-icon">⚡</div>
               <div className="info-number">30 Min</div>
               <div className="info-label">Quick Service</div>
             </div>
-            
             <div className="info-card">
               <div className="info-icon">✅</div>
               <div className="info-number">100%</div>

@@ -381,14 +381,31 @@ function SpecialServicesTab({ services, onRefresh, setMessage }) {
           {[...services].sort((a, b) => a.order - b.order).map(s => (
             <div key={s._id} className="card">
               {s.heroImage && <img src={s.heroImage} alt={s.name} style={{ width: "100%", height: "12rem", objectFit: "cover", borderRadius: "0.5rem", marginBottom: "1rem" }} />}
-              <h3 className="card-title">{s.name}</h3>
-              <p className="card-subtitle" style={{ color: "rgb(252,165,165)", fontStyle: "italic" }}>"{s.tagline}"</p>
-              <p className="text-gray text-sm mb-3">{s.description?.substring(0, 100)}...</p>
-              {s.contentImage && <div className="mb-3 p-3" style={{ background: "rgba(59,130,246,0.1)", borderRadius: "0.5rem" }}><img src={s.contentImage} alt="content" style={{ width: "100%", height: "7rem", objectFit: "cover", borderRadius: "0.375rem" }} /></div>}
-              <p className="text-xs text-gray mb-4">Order: #{s.order}</p>
+              <h3 className="card-title">
+                {s.name}
+                </h3>
+              <p className="card-subtitle" style={{ color: "rgb(252,165,165)", fontStyle: "italic" }}>
+                "{s.tagline}"
+                </p>
+              <p className="text-gray text-sm mb-3">
+                {s.description?.substring(0, 100)}...
+                </p>
+              {s.contentImage && <div className="mb-3 p-3" style={{ background: "rgba(59,130,246,0.1)", borderRadius: "0.5rem" }}><img src={s.contentImage} alt="content" style={{ width: "100%", height: "7rem", objectFit: "cover", borderRadius: "0.375rem" }} />
+              </div>}
+              <p className="text-xs text-gray mb-4">
+                Order: #{s.order}
+                </p>
               <div className="card-actions">
-                <button type="button" onClick={() => { setEditing(s); setForm(s); setShow(true); setHeroPreview(null); setContentPreview(null); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="btn-edit">Edit</button>
-                <button type="button" onClick={() => handleDelete(s._id)} className="btn-delete">Delete</button>
+                <button type="button"
+                 onClick={() => { setEditing(s); setForm(s); setShow(true); setHeroPreview(null); setContentPreview(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                  className="btn-edit">
+                    Edit
+                    </button>
+                <button type="button" 
+                onClick={() => handleDelete(s._id)} 
+                className="btn-delete">
+                  Delete
+                  </button>
               </div>
             </div>
           ))}
@@ -427,9 +444,16 @@ function VehicleBrandsTab({ brands, onRefresh, setMessage }) {
   return (
     <div>
       <div className="section-header">
-        <div><h2 className="section-title">Vehicle Brands</h2><p className="section-subtitle">Brands & models for booking form</p></div>
+        <div><h2 className="section-title">
+          Vehicle Brands
+          </h2>
+          <p className="section-subtitle">
+            Brands & models for booking form
+            </p>
+            </div>
         <button onClick={() => { setShow(true); setEditing(null); setForm({ name: "", models: "" }); }} className="btn-primary">
-          <SVG path="M12 4v16m8-8H4" className="icon-sm" /> Add Brand
+          <SVG path="M12 4v16m8-8H4" className="icon-sm" /> 
+          Add Brand
         </button>
       </div>
       {show && (
@@ -501,11 +525,20 @@ function CarBrandsTab({ brands, onRefresh, setMessage }) {
       </div>
       {show && (
         <div className="form-card">
-          <h3 className="form-title">{editing ? "Edit Brand" : "Add Brand"}</h3>
+          <h3 className="form-title">
+            {editing ? "Edit Brand" : "Add Brand"}
+            </h3>
           <form onSubmit={handleSubmit}>
-            <div className="form-group"><label className="form-label">Brand Name *</label><input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required placeholder="Toyota" className="form-input" /></div>
             <div className="form-group">
-              <label className="form-label">Brand Logo * {editing && "(Upload new to replace)"}</label>
+              <label className="form-label">
+                Brand Name *
+                </label>
+                <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required placeholder="Toyota" className="form-input" />
+                </div>
+            <div className="form-group">
+              <label className="form-label">
+                Brand Logo * {editing && "(Upload new to replace)"}
+                </label>
               <input type="file" name="carBrandLogo" accept="image/*" onChange={e => { const f = e.target.files[0]; if (f) setPreview(URL.createObjectURL(f)); }} className="form-input" style={{ padding: "0.5rem" }} required={!editing} />
               <ImagePreview src={preview || (!preview && editing && form.logo ? form.logo : null)} style={{ width: "10rem", height: "10rem", objectFit: "contain", background: "#f3f4f6" }} />
             </div>
@@ -574,11 +607,28 @@ function CarModelsTab({ models, onRefresh, setMessage }) {
         <div className="form-card">
           <h3 className="form-title">{editing ? "Edit Car Model" : "Add Car Model"}</h3>
           <form onSubmit={handleSubmit}>
-            <div className="form-group"><label className="form-label">Brand Name *</label><input type="text" value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} required placeholder="Toyota" className="form-input" /></div>
-            <div className="form-group"><label className="form-label">Model Name *</label><input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required placeholder="Fortuner" className="form-input" /></div>
-            <div className="form-group"><label className="form-label">Service Count</label><input type="number" value={form.serviceCount} onChange={e => setForm({ ...form, serviceCount: parseInt(e.target.value) })} min="1" className="form-input" /></div>
             <div className="form-group">
-              <label className="form-label">Model Image * {editing && "(Upload new to replace)"}</label>
+              <label className="form-label">
+                Brand Name *
+                </label>
+                <input type="text" value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} required placeholder="Toyota" className="form-input" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">
+                Model Name *
+                </label>
+                <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required placeholder="Fortuner" className="form-input" />
+                </div>
+            <div className="form-group">
+              <label className="form-label">
+                Service Count
+                </label>
+                <input type="number" value={form.serviceCount} onChange={e => setForm({ ...form, serviceCount: parseInt(e.target.value) })} min="1" className="form-input" />
+                </div>
+            <div className="form-group">
+              <label className="form-label">
+                Model Image * {editing && "(Upload new to replace)"}
+                </label>
               <input type="file" name="carModelImage" accept="image/*" onChange={e => { const f = e.target.files[0]; if (f) setPreview(URL.createObjectURL(f)); }} className="form-input" style={{ padding: "0.5rem" }} required={!editing} />
               <ImagePreview src={preview || (!preview && editing && form.image ? form.image : null)} style={{ width: "16rem", height: "10rem", objectFit: "contain", background: "#f3f4f6" }} />
             </div>
@@ -632,7 +682,15 @@ function HeroImagesTab({ images, onRefresh, setMessage }) {
 
   return (
     <div>
-      <div className="section-header"><div><h2 className="section-title">Hero Images</h2><p className="section-subtitle">Homepage hero carousel images</p></div></div>
+      <div className="section-header">
+        <div>
+          <h2 className="section-title">
+            Hero Images
+            </h2>
+            <p className="section-subtitle">
+              Homepage hero carousel images</p>
+              </div>
+              </div>
       <div className="form-card">
         <h3 className="form-title">Upload New Hero Image</h3>
         <form onSubmit={handleUpload}>
@@ -713,19 +771,40 @@ export default function AdminDashboard() {
     { id: "hero-images", label: "Hero Images", icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z", count: data.heroImages.length },
   ];
 
-  const handleAcceptBooking = async (booking) => {
-    if (!confirm(`Accept booking from ${booking.name}?`)) return;
-    const id = typeof booking._id === "object" ? (booking._id.$oid || booking._id.toString()) : booking._id;
-    const res = await fetch("/api/bookings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ _id: id, status: "confirmed" }) }).then(r => r.json());
-    if (res.success) { setMessage("✅ Booking accepted!"); fetchData(); setTimeout(() => setMessage(""), 3000); }
-  };
+  // Find this function and replace:
+const handleAcceptBooking = async (booking) => {
+  if (!confirm(`Accept booking from ${booking.name}?`)) return;
+  
+  // ✅ Correctly extract _id as string
+  const id = booking._id?.toString() || booking._id;
+  
+  const res = await fetch("/api/bookings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ _id: id, status: "confirmed" }) // ✅ Send _id
+  }).then(r => r.json());
+  
+  if (res.success) {
+    setMessage("✅ Booking accepted! " + (res.emailSent ? "Email sent." : "Email failed."));
+    fetchData();
+    setTimeout(() => setMessage(""), 3000);
+  } else {
+    setMessage("❌ " + res.error);
+  }
+};
 
-  const handleDeleteBooking = async (booking) => {
-    if (!confirm(`Delete booking from ${booking.name}?`)) return;
-    const id = typeof booking._id === "object" ? booking._id.toString() : booking._id;
-    const res = await fetch(`/api/bookings?id=${id}`, { method: "DELETE" }).then(r => r.json());
-    if (res.success) { setMessage("✅ Booking deleted!"); fetchData(); setTimeout(() => setMessage(""), 3000); }
-  };
+const handleDeleteBooking = async (booking) => {
+  if (!confirm(`Delete booking from ${booking.name}?`)) return;
+  const id = booking._id?.toString() || booking._id; // ✅ Correctly extract _id
+  const res = await fetch(`/api/bookings?id=${id}`, { method: "DELETE" }).then(r => r.json());
+  if (res.success) {
+    setMessage("✅ Booking deleted!");
+    fetchData();
+    setTimeout(() => setMessage(""), 3000);
+  } else {
+    setMessage("❌ " + res.error);
+  }
+};
 
   if (loading) return (
     <div className="loading-container">
@@ -767,7 +846,9 @@ export default function AdminDashboard() {
 
         {/* Right Sidebar */}
         <aside className="right-sidebar">
-          <p className="sidebar-label">Navigation</p>
+          <p className="sidebar-label">
+            Navigation
+            </p>
           <nav className="sidebar-nav">
             {tabs.map(tab => (
               <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`sidebar-tab ${activeTab === tab.id ? "active" : ""}`}>

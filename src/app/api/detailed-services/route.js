@@ -1,52 +1,70 @@
-import { NextRequest, NextResponse } from 'next/server';
-const { MongoClient } = require('mongodb'); // Your native driver
+import { NextResponse } from "next/server";
+import clientPromise from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
-const uri = process.env.MONGODB_URI;
-const client = new MongoClient(uri);
-
-export async function GET(request) {
+export async function GET() {
   try {
-    await client.connect();
-    const db = client.db('your-db-name'); // Replace with your DB
-    const services = await db.collection('detailed-services').find({}).sort({ order: 1 }).toArray();
-    return NextResponse.json({ services });
+    const client = await clientPromise;
+    const db = client.db("automotivecarcare");
+    const services = await db
+      .collection("detailed-services")
+      .find({})
+      .sort({ order: 1 })
+      .toArray();
+    return NextResponse.json({ success: true, services });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
-  } finally {
-    await client.close();
+    return NextResponse.json({ success: false, services: [] });
   }
 }
 
 export async function POST(request) {
   try {
-    const body = await request.json();
-    await client.connect();
-    const db = client.db('your-db-name');
-    const result = await db.collection('detailed-services').insertOne(body);
+    const serviceData = await request.json();
+    if (!serviceData.slug) {
+      serviceData.slug = serviceData.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+    }
+    const client = await clientPromise;
+    const db = client.db("automotivecarcare");
+    const result = await db.collection("detailed-services").insertOne({
+      ...serviceData,
+      image: serviceData.image || null,
+      cloudinaryPublicId: serviceData.cloudinaryPublicId || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     return NextResponse.json({ success: true, id: result.insertedId });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to save' }, { status: 500 });
-  } finally {
-    await client.close();
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// Add PUT/DELETE for edit/delete if needed
 export async function PUT(request) {
-  const body = await request.json();
-  await client.connect();
-  const db = client.db('your-db-name');
-  await db.collection('detailed-services').updateOne({ _id: body.id }, { $set: body });
-  await client.close();
-  return NextResponse.json({ success: true });
+  try {
+    const { _id, ...serviceData } = await request.json(); // ✅ _id
+    const client = await clientPromise;
+    const db = client.db("automotivecarcare");
+    const result = await db.collection("detailed-services").updateOne(
+      { _id: new ObjectId(_id) }, // ✅ _id
+      { $set: { ...serviceData, updatedAt: new Date() } }
+    );
+    return NextResponse.json({ success: true, modified: result.modifiedCount });
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
 
 export async function DELETE(request) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
-  await client.connect();
-  const db = client.db('your-db-name');
-  await db.collection('detailed-services').deleteOne({ _id: id });
-  await client.close();
-  return NextResponse.json({ success: true });
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    const client = await clientPromise;
+    const db = client.db("automotivecarcare");
+    await db.collection("detailed-services").deleteOne({ _id: new ObjectId(id) }); // ✅ _id
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
