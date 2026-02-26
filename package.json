@@ -9,6 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
     "cloudinary": "^2.8.0",
     "framer-motion": "^12.28.1",
     "mongodb": "^7.0.0",

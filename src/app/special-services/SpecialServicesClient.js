@@ -9,7 +9,7 @@ export default function SpecialServicesPage() {
   const [activeIndex, setActiveIndex] = useState(null);
   const [specialServices, setSpecialServices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const searchParams = useSearchParams(); // ✅ Read URL params
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -20,7 +20,6 @@ export default function SpecialServicesPage() {
           const sorted = (data.services || []).sort((a, b) => a.order - b.order);
           setSpecialServices(sorted);
 
-          // ✅ Auto-select service from URL param
           const serviceSlug = searchParams.get("service");
           if (serviceSlug) {
             const idx = sorted.findIndex(s => s.slug === serviceSlug);
